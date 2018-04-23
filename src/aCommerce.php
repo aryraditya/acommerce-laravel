@@ -9,16 +9,36 @@ use GuzzleHttp\Exception\ServerException;
 
 class aCommerce
 {
-
     const DATETIME_FORMAT   = 'Y-m-d\TH:i:s.v\Z';
 
+    /**
+     * aCommerce Environment
+     *
+     * @var bool
+     */
     protected $production   = true;
 
-    public $username;
+    /**
+     * aCommerce API Username
+     *
+     * @var string
+     */
+    private $username;
 
-    public $key;
+    /**
+     * aCommerce API Key
+     *
+     * @var string
+     */
+    private $key;
 
-
+    /**
+     * aCommerce constructor.
+     *
+     * @param null $username
+     * @param null $key
+     * @param bool $production
+     */
     public function __construct($username = null, $key = null, $production = true)
     {
         $this->username     = $username ?: config('acommerce.username');
@@ -28,6 +48,7 @@ class aCommerce
 
     /**
      * Get Unique ID
+     *
      * @return string
      */
     public function getId()
@@ -35,22 +56,76 @@ class aCommerce
         return 'acommerce-'.$this->username . $this->key;
     }
 
+    /**
+     * Base URL for authentication
+     *
+     * @return string
+     */
+    public function baseAuthUrl()
+    {
+        return $this->production ? 'https://api.acommerce.asia' : 'https://api.acommercedev.com';
+    }
+
+    /**
+     * Base URL for fulfillment endpoint api
+     *
+     * @return string
+     */
+    public function baseFulfillmentUrl()
+    {
+        return $this->production ? 'https://fulfillment.api.acommerce.asia' : 'https://fulfillment.api.acommercedev.com';
+    }
+
+    /**
+     * Base URL for shipping endpoint api
+     *
+     * @return string
+     */
+    public function baseShippingUrl()
+    {
+        return $this->production ? 'https://shipping.api.acommerce.asia' : 'https://shipping.api.acommercedev.com';
+    }
+
+    /**
+     * Get aCommerce Username
+     *
+     * @return mixed
+     */
     public function getUsername()
     {
         return $this->username;
     }
 
+    /**
+     * Set aCommerce Username
+     *
+     * @param $value
+     *
+     * @return $this
+     */
     public function setUsername($value)
     {
         $this->username = $value;
         return $this;
     }
 
+    /**
+     * Get aCommerce API KEY
+     *
+     * @return string
+     */
     public function getKey()
     {
         return $this->key;
     }
 
+    /**
+     * Set aCommerce API Key
+     *
+     * @param string|integer $value
+     *
+     * @return $this
+     */
     public function setKey($value)
     {
         $this->key = $value;
@@ -84,7 +159,7 @@ class aCommerce
     public function auth()
     {
         $client     = new Client([
-            'base_uri'  => $this->production ? 'https://api.acommerce.asia' : 'https://api.acommercedev.com'
+            'base_uri'  => $this->baseAuthUrl()
         ]);
 
         try {
@@ -208,8 +283,8 @@ class aCommerce
     /**
      * Get sales order's detail
      *
-     * @param $channelId
-     * @param $orderId
+     * @param string $channelId
+     * @param string $orderId
      *
      * @return mixed
      */
@@ -221,19 +296,67 @@ class aCommerce
         return json_decode($request->getBody()->getContents());
     }
 
+
+    /**
+     * Shipping Order Retrieval
+     * https://acommerce.atlassian.net/wiki/spaces/PA/pages/16515568/Shipping+Orders
+     *
+     * @param string $shippingPartnerId
+     * @param string $shippingOrderId
+     *
+     * @return mixed
+     */
+    public function getShippingOrder($shippingPartnerId, $shippingOrderId)
+    {
+        $url        = strtr('partner/:shippingPartnerID/order/:shippingOrderId', [
+            ':shippingPartnerID'    => $shippingPartnerId,
+            ':shippingOrderId'      => $shippingOrderId,
+        ]);
+
+        $request    = $this->request('GET', $url, [], $this->baseShippingUrl());
+
+        return json_decode($request->getBody()->getContents());
+    }
+
+
+    /**
+     * Shipping Order Creation
+     * https://acommerce.atlassian.net/wiki/spaces/PA/pages/16515568/Shipping+Orders
+     *
+     * @param string $shippingPartnerId
+     * @param string $shippingOrderId
+     * @param array  $data
+     *
+     * @return mixed
+     */
+    public function shippingOrderCreation($shippingPartnerId, $shippingOrderId, $data = [])
+    {
+        $url        = strtr('partner/:shippingPartnerID/order/:shippingOrderId', [
+            ':shippingPartnerID'    => $shippingPartnerId,
+            ':shippingOrderId'      => $shippingOrderId,
+        ]);
+
+        $request    = $this->request('PUT', $url, [
+            'json'  => $data
+        ], $this->baseShippingUrl());
+
+        return json_decode($request->getBody()->getContents());
+    }
+
     /**
      * Request to end point
      *
      * @param string $method
      * @param string $url
      * @param array $data
+     * @param string $baseUrl
      *
      * @return mixed|null|\Psr\Http\Message\ResponseInterface
      */
-    public function request($method, $url, $data = [])
+    public function request($method, $url, $data = [], $baseUrl = null)
     {
         try {
-            return $this->client()
+            return $this->client($baseUrl)
                 ->request($method, $url, $data);
         } catch (ServerException $ex) {
             return $ex->getResponse();
@@ -244,13 +367,14 @@ class aCommerce
 
     /**
      * Guzzle Client config
+     * @param string $baseUrl Base URL for client
      *
      * @return Client
      */
-    protected function client()
+    protected function client($baseUrl = null)
     {
         $client         = new Client([
-            'base_uri'  => $this->production ? 'https://fulfillment.api.acommerce.asia' : 'https://fulfillment.api.acommercedev.com',
+            'base_uri'  => $baseUrl ?: $this->baseFulfillmentUrl(),
             'verify'    => false,
             'headers'   => [
                 'X-Subject-Token'   => $this->token(),
