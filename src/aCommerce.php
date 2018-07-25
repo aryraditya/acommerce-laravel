@@ -246,7 +246,7 @@ class aCommerce
      *
      * @return array
      */
-    public function allInventory($channelId, $partnerId, $since = null, $startPage = null)
+    public function allInventory($channelId, $partnerId, $since = null, $startPage = 1)
     {
         $inventory = [];
         $response  = $this->inventory($channelId, $partnerId, $since, $startPage);
