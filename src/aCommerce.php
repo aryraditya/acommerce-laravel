@@ -211,19 +211,21 @@ class aCommerce
      *
      * @return \stdClass
      */
-    public function inventory($channelId, $partnerId, $since = null, $page = null)
+    public function inventory($channelId, $partnerId, $since = null, $page = 1)
     {
         $url        = strtr('channel/:channelId/allocation/merchant/:merchantId', [
             ':channelId'    => $channelId,
             ':merchantId'   => $partnerId
         ]);
+        $page       = $page === 0 || $page === false ? null : $page;
 
-        $request    = $this->request('GET', $url, [
+        $data       = [
             'query' => [
                 'since' => $since,
-                'page'  => $page === 0 ? null : $page,
+                'page'  => $page,
             ]
-        ]);
+        ];
+        $request    = $this->request('GET', $url, $data);
 
         $link               = $request->getHeaderLine('Link');
         $response           = new \stdClass();
